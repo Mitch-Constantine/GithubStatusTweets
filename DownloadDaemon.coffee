@@ -2,8 +2,9 @@ tweetDownloader = require './tweetDownloader'
 dal = require './DAL'
 
 configuration = {
-	pollInterval : 60000
-	term : "403 OR 400 OR 401 OR 427 OR \"Queen Elizabeth Way\" OR QEW OR  \"Don Valley\" OR DVP near:\"Toronto, ON\""
+	pollInterval : 1000
+	term : "401 OR 400 OR 403 OR 407 OR QEW OR DVP OR \"Queen Elizabeth Way\" OR \"Don Valley Parkway\"",
+	location: "43.716589,-79.340686,20mi"
 	host: 'localhost'
 	port: 27017
 	databaseName: 'test'
@@ -11,10 +12,14 @@ configuration = {
 	sinceIdCollectionName: 'sinceId'
 }
 
+storage = new dal.Storage()
+tweets = new dal.Twitter()
+
 doDownload = ()->
-	tweetDownloader.download configuration, storage, tweets, (err)->
+	console.log "downloading"
+	tweetDownloader.download configuration, storage, tweets, (err, err_twitter)->
 		console.log err if err
-		console.log "Tick"
-		setInterval configuration.pollInterval, doDownload
+		console.log err_twitter if err_twitter
+		setTimeout doDownload, configuration.pollInterval
 
 doDownload()

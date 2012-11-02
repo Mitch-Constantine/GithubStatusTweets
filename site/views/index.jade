@@ -1,0 +1,17 @@
+extends layout
+
+block content
+
+	script#tweet_template(type="text/template")
+		div.tweetDisplay
+			div.buttonBar
+				input.relevantButton(type="button", value="Relevant")
+				input.irelevantButton(type="button", value="Irelevant")
+			div.user_name <%=from_user_name%>(<%=from_user%>) at <%=created_at%>:
+			div.text <%=text%>
+
+	input#next(type="button", value="Next")
+	input#previous(type="button", value="Previous")		
+	div#tweets
+	
+	input#relevantOnly(type="hidden", value=relevantOnly)
