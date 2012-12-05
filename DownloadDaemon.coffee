@@ -16,7 +16,6 @@ storage = new dal.Storage()
 tweets = new dal.Twitter()
 
 doDownload = ()->
-	console.log "downloading"
 	tweetDownloader.download configuration, storage, tweets, (err, err_twitter)->
 		console.log err if err
 		console.log err_twitter if err_twitter

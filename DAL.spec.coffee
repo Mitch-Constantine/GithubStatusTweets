@@ -181,12 +181,12 @@ xdescribe "Twitter access", ->
 			done = false
 			twitterDal = new DAL.Twitter()
 			async.waterfall [
-				(next)->twitterDal.query "party", null, 200, next
+				(next)->twitterDal.query "party", null, 70, next
 			],
 			(err, data)->
 				done = true
 				expect(err).toBeFalsy()
-				expect( data.length ).toBe( 200 ) if data.length
+				expect( data.length ).toBe( 70 ) if data.length
 		waitsFor (->done), "tweet searching - many", 20000
 		
 	it "Retrieves tweets newer than a given id", ->
@@ -195,8 +195,9 @@ xdescribe "Twitter access", ->
 			twitterDal = new DAL.Twitter()
 			async.waterfall [
 				(next)->twitterDal.query "party", null, 5, next
-				(data, next)->twitterDal.query_after data[3].id, "party", null, 
-					200, (err, newData)->next(err, newData, data[3].created_at)
+				(data, next)->
+					twitterDal.query_after data[3].id, "party", null, 
+					70, (err, newData)->next(err, newData, data[3].created_at)
 			],
 			(err, data, date_limit)->
 				done = true

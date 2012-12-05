@@ -18,17 +18,18 @@ exports.markRelevantTweets = (dal, wordStatistics, next)->
 			unless err
 				queue.push( 
 					(callback)-> 
-						markTweet dal, tweet, wordStatistics, () ->
-							callback()
+						markTweet dal, tweet, wordStatistics, () -> callback()
 					
 				)
+				if queue.drain == null
+					queue.drain = ()->
+						next()	
+			else
+				console.log err		
 		), 			
 		-> 
 			if queue.empty
 				next()
-			else
-				queue.drain = ()-> 
-					next()			
 	)
 	
 # Wait till everything done
@@ -37,7 +38,8 @@ markTweet = (dal, tweet, wordStatistics, next) ->
 	words = wordsOf(tweet)
 	relevance = computeRelevance(words, wordStatistics)
 	tweet.deemedRelevant = (relevance >= relevanceThreshold)
-	dal.update {_id:tweet._id}, { $set : { deemedRelevant : tweet.deemedRelevant } }, 
+	dal.update {_id:tweet._id}, 
+		{ $set : { deemedRelevant : tweet.deemedRelevant } },
 		(err)-> next()
 	
 computeRelevance = (words, wordStatistics) ->
@@ -63,6 +65,18 @@ relevanceOf = (wordStatistics, word)->
 
 addToStatistics = (statistics, tweet) ->
 	words = wordsOf(tweet)
+	
+	tweetRelevantCount = tweet.relevantCount or 0
+	tweetIrelevantCount = tweet.irelevantCount or 0
+	
+	isRelevant = tweetRelevantCount > tweetIrelevantCount
+	isIrelevant = tweetRelevantCount < tweetIrelevantCount
+		
+	if isRelevant
+		statistics.totalRelevant = (statistics.totalRelevant or 0) + 1
+	if isIrelevant
+		statistics.totalIrelevant = (statistics.totalIrelevant or 0) + 1
+		
 	for word in words
 		unless statistics[word]
 			statistics[word] = {
@@ -71,15 +85,14 @@ addToStatistics = (statistics, tweet) ->
 				totalCount : 0
 			}
 		wordStatistics = statistics[word] 
-		wordStatistics.totalCount = wordStatistics.totalCount+1
-		tweetRelevantCount = tweet.relevantCount or 0
-		tweetIrelevantCount = tweet.irelevantCount or 0
-		if tweetRelevantCount > tweetIrelevantCount
+		if isRelevant
 			wordStatistics.relevantCount = wordStatistics.relevantCount + 1
-		if tweetRelevantCount < tweetIrelevantCount
+		if isIrelevant
 			wordStatistics.irelevantCount = wordStatistics.irelevantCount + 1
+		if isRelevant or isIrelevant
+			wordStatistics.totalCount = wordStatistics.totalCount+1 
 
-wordsOf = (tweet)-> splitPhrase(tweet.from_user + " " + tweet.text)
+wordsOf = (tweet)-> splitPhrase(tweet.user.screen_name + " " + tweet.text)
 	
 splitPhrase = (phrase)->
 	parts = phrase.split(/[^A-Za-z0-9_]/)

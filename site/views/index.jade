@@ -5,13 +5,18 @@ block content
 	script#tweet_template(type="text/template")
 		div.tweetDisplay
 			div.buttonBar
-				input.relevantButton(type="button", value="Relevant")
-				input.irelevantButton(type="button", value="Irelevant")
-			div.user_name <%=from_user_name%>(<%=from_user%>) at <%=created_at%>:
+				input.relevantButton.adminOnly(type="button", value="Relevant")
+				input.irelevantButton.adminOnly(type="button", value="Irelevant")
+			div.user_name <%=user.name%>(<%=user.screen_name%>) at <%=created_at%>:
 			div.text <%=text%>
+			div.adminOnly.text <%= relevantCount %> consider it relevant, <%= irelevantCount%> consider it irrelevant
+			div.adminOnly.text  Marked in database as <%= deemedRelevantText %>
+			div.adminOnly.text ID <%= id %>
+			br
 
 	input#next(type="button", value="Next")
 	input#previous(type="button", value="Previous")		
 	div#tweets
+	div#pageNumber
 	
 	input#relevantOnly(type="hidden", value=relevantOnly)

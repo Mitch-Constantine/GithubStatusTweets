@@ -21,16 +21,16 @@ describe "Finding relevant and irelevant tweets", ->
 			async.waterfall( [
 				(next)->dal.reset next,
 				(next)->dal.save( 
-					{ text: "Relevantone, relevantTwo??", from_user:"", relevantCount:4 }, 
+					{ text: "Relevantone, relevantTwo??", user : {screen_name:""}, relevantCount:4 }, 
 					next ),
 				(next)->dal.save( 
-					{ text: "relevantone!", from_user:"RelevantThree", relevantCount : 9}, 
+					{ text: "relevantone!", user : {screen_name:"RelevantThree"}, relevantCount : 9}, 
 					next ),
 				(next)->dal.save( 
-					{ text: "irelevantone, irelevantTwo??", from_user:"", irelevantCount : 3 }, 
+					{ text: "irelevantone, irelevantTwo??", user : {screen_name:""}, irelevantCount : 3 }, 
 					next ),
 				(next)->dal.save( 
-					{ text: "iRelevantone, ??", from_user:"irelevant_Three", irelevantCount : 3 }, next ),
+					{ text: "iRelevantone, ??", user : {screen_name:"irelevant_Three"}, irelevantCount : 3 }, next ),
 				(next)->relevanceLogic.createStatistics dal, next,
 				(data, next)->dal.close (err)->next(err,data)			
 			],
@@ -98,13 +98,13 @@ describe "Finding relevant and irelevant tweets", ->
 			async.waterfall( [
 				(next)->dal.reset next,
 				(next)->dal.save( 
-					{ text: phrase1, from_user:"", relevantCount:4 }, 
+					{ text: phrase1, user : {screen_name :"" }, relevantCount:4 }, 
 					next ),
 				(next)->dal.save( 
-					{ text: phrase2, from_user:"", relevantCount : 9}, 
+					{ text: phrase2, user : {screen_name:"" }, relevantCount : 9}, 
 					next ),
 				(next)->dal.save( 
-					{ text: text3, from_user:phrase3, irelevantCount : 3 }, 
+					{ text: text3, user : {screen_name:phrase3}, irelevantCount : 3 }, 
 					next ),
 				(next)->relevanceLogic.markRelevantTweets dal, wordStatistics, next
 				(next)->dal.getAll next,
@@ -122,7 +122,7 @@ describe "Finding relevant and irelevant tweets", ->
 						expect( tweet.deemedRelevant ).toBeTruthy("Tweet 1 expected relevant")
 					else if tweet.text == phrase2
 						expect( tweet.deemedRelevant ).toBeFalsy("Tweet 2 expected irrelevant")
-					else if tweet.from_user == phrase3
+					else if tweet.user.screen_name == phrase3
 						expect( tweet.deemedRelevant).toBeFalsy("Tweet 3 expected irrelevant")
 			)
 		

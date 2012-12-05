@@ -45,8 +45,6 @@ exports.Storage = class root.Storage
 			callback
 				
 	update : (condition, change, callback) ->
-		console.log condition
-		console.log change
 		async.waterfall [
 			(next)=> @connect next,
 			(next)=> @tweetCollection.update condition, change,  
@@ -110,7 +108,9 @@ exports.Storage = class root.Storage
 		
 		searchParameters = 
 			(if relevantOnly 
-				{ deemedRelevant : true } 
+				{ $where : "this.deemedRelevant || " +
+				 "( (this.relevantCount || 0) > (this.irelevantCount ||0) )"
+				} 
 			else 
 				{})
 		
@@ -189,7 +189,7 @@ exports.Twitter = class root.Twitter
 		@accumulate_results null, since_id, [], term, location, limit, callback		
 	
 	accumulate_results: (max_id, since_id, already_found, term, location, limit, callback)=>
-	
+			
 		params = { q: term, rpp:@rpp, result_type: 'recent' }
 		params.since_id = since_id if since_id
 		params.max_id = max_id if max_id
@@ -202,9 +202,9 @@ exports.Twitter = class root.Twitter
 		  , access_token_secret:  'ZjRjSC5ZmOoIlRN295BKTCzXvQlFLWZl9SoLYuuMUE'
 		} unless @T
 		
-		@T.get 'search', params, (err, reply)=> 
-			
-			data_found = if reply and reply.results then reply.results else []
+		@T.get 'search/tweets', params, (err, reply)=> 
+									
+			data_found = if reply and reply.statuses then reply.statuses else []
 			data_found = (tweet for tweet in data_found when tweet.id != since_id and tweet.id != max_id)		
 			already_found = already_found.concat data_found
 			
