@@ -1,11 +1,13 @@
 mongo = require('mongodb')
 async = require('async')
-Twit = require('twit')
+logger = require('./logger')
 
 Server = mongo.Server
 Db = mongo.Db
 
 root = exports ? this
+
+log = (message, what)->logger.log 'database', message, what
 
 exports.Storage = class root.Storage
 	
@@ -21,20 +23,24 @@ exports.Storage = class root.Storage
 	sinceIdCollection : null
 	
 	configure : (configuration) => 
+		log 'configuration', configuration
 		@host = configuration.host
 		@port = configuration.port
 		@databaseName = configuration.databaseName
 		@tweetCollectionName = configuration.tweetCollectionName
 		@sinceIdCollectionName = configuration.sinceIdCollectionName 
 	
-	reset : (callback)-> async.waterfall [
-			(next)=> @connect next,
-			(next) => @db.executeDbCommand {drop:@tweetCollectionName}, (err)->next(err),
-			(next) => @db.executeDbCommand {drop:@sinceIdCollectionName}, (err)->next(err)
+	reset : (callback)-> 
+			log 'reset', ''
+			async.waterfall [
+				(next)=> @connect next,
+				(next) => @db.executeDbCommand {drop:@tweetCollectionName}, (err)->next(err),
+				(next) => @db.executeDbCommand {drop:@sinceIdCollectionName}, (err)->next(err)
 			],
 			callback
 		
 	save : (data, callback) ->
+		log 'save', data
 		async.waterfall [
 			(next)=> @connect next,
 			(next)=> @getNextSeqNumber next,
@@ -45,6 +51,7 @@ exports.Storage = class root.Storage
 			callback
 				
 	update : (condition, change, callback) ->
+		log 'update', [condition, change]
 		async.waterfall [
 			(next)=> @connect next,
 			(next)=> @tweetCollection.update condition, change,  
@@ -53,6 +60,7 @@ exports.Storage = class root.Storage
 			callback				
 	
 	setRelevant : (id, isRelevant, callback) ->
+		log 'setRelevant', [id, isRelevant]
 		async.waterfall [
 			(next)=> @connect next,
 			(next)=> @getById id, next
@@ -75,34 +83,43 @@ exports.Storage = class root.Storage
 			callback
 
 	getById : (id, callback)->
+		log 'getById', id
 		async.waterfall [
 			(next)=> @connect next,
 			(next) => @tweetCollection.find({id : id}).toArray next
 		],
 		(err, data)->
+			log 'getById', data
 			callback(err, data)
 
 	getAll : (callback)->
+		log 'getAll', ''
 		async.waterfall [
 			(next)=> @connect next,
 			(next) => @tweetCollection.find().toArray next
 		],
 		(err, data)->
+			log 'getAll', data
 			callback(err, data)
 			
 	eachTweet : (forEachElement, atEnd) =>
+		logger.log 'database', 'eachTweet'
 		@connect (err, data)=>
 			unless err
 				cursor = @tweetCollection.find()
 				cursor.each (err, item)=> 
 					unless err
 						if item 
+							log 'eachTweet - processing', [err, item]
 							forEachElement err, item
 						else
+							log 'eachTweet - done', err
 							cursor.close()	
 							atEnd err
 							
 	getPage : (start, pageSize, otherParams...)->
+		log 'getPage', [start, pageSize, otherParams]
+		
 		relevantOnly = otherParams.length == 2 && otherParams[0]
 		callback = otherParams[otherParams.length-1]
 		
@@ -113,6 +130,7 @@ exports.Storage = class root.Storage
 				} 
 			else 
 				{})
+		log 'getPage', searchParameters
 		
 		async.waterfall [
 			(next)=> @connect next,
@@ -122,9 +140,12 @@ exports.Storage = class root.Storage
 				.limit(pageSize)
 				.toArray next
 		],
-		callback
+		(err, data) -> 
+			log 'getPage', data
+			callback(err, data)
 
 	setNextSinceId : (id, callback) =>
+		log 'setNextSinceId', id
 		async.waterfall [
 			(next)=> @connect next,
 			(next)=> @sinceIdCollection.update {}, {sinceId : id}, 
@@ -133,16 +154,21 @@ exports.Storage = class root.Storage
 		callback
 		
 	getNextSinceId : (callback) =>
+		log 'getNextSinceId'
 		async.waterfall [
 			(next)=> @connect next,
 			(next)=> @sinceIdCollection.findOne (err,data)->
 				next(err, if data then data.sinceId else null) 
 		],
-		callback	
+		(err, data) ->
+			log 'getNextSinceId', [err, data]
+			callback err, data	
 
 	getNextSeqNumber : (callback) =>
+		log 'getNextSeqNumber'
 		lastTweet = null
 		@tweetCollection.find().sort({seqNumber:-1}).limit(1).toArray (err,data)->
+			log 'getNextSeqNumber', [err, data]
 			if err or data == null or data.length == 0 
 				callback(err, 0)
 				return
@@ -177,44 +203,3 @@ exports.Storage = class root.Storage
 			element.seqNumber = seqNumber
 			seqNumber = seqNumber-1
 
-exports.Twitter = class root.Twitter
-
-	rpp : 100
-	T : null
-
-	query: (term, location, limit, callback) => 
-		@accumulate_results null, null, [], term, location, limit, callback		
-	
-	query_after: (since_id, term, location, limit, callback) => 
-		@accumulate_results null, since_id, [], term, location, limit, callback		
-	
-	accumulate_results: (max_id, since_id, already_found, term, location, limit, callback)=>
-			
-		params = { q: term, rpp:@rpp, result_type: 'recent' }
-		params.since_id = since_id if since_id
-		params.max_id = max_id if max_id
-		params.geocode = location if location
-		
-		@T = new Twit {
-			consumer_key:         'ILqKkqOZsNWLvSKiw1QSw'
-		  , consumer_secret:      'XtgOiG4R3mBQYeeUdDtCUNmbiWc8lgrrTaEHdRvMIsY'
-		  , access_token:         '590361240-PE92HYQYkODoX8wqIxWB5REk5rWJVFtI6RaOihBn'
-		  , access_token_secret:  'ZjRjSC5ZmOoIlRN295BKTCzXvQlFLWZl9SoLYuuMUE'
-		} unless @T
-		
-		@T.get 'search/tweets', params, (err, reply)=> 
-									
-			data_found = if reply and reply.statuses then reply.statuses else []
-			data_found = (tweet for tweet in data_found when tweet.id != since_id and tweet.id != max_id)		
-			already_found = already_found.concat data_found
-			
-			if data_found.length == 0 or (limit and limit < already_found.length)
-				data_to_return = if limit then  already_found[0..limit-1] else already_found
-				callback( null, data_to_return)
-				return
-
-			max_id = data_found[data_found.length-1].id
-			if not err
-				@accumulate_results max_id, since_id, already_found, term, location, limit, callback
-			else
-				callback(err, data_to_return)

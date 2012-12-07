@@ -1,7 +1,8 @@
-async = require('async')
+async = require 'async'
 
-relevanceLogic = require( './relevanceLogic')
-dal = require( './DAL')
+relevanceLogic = require './relevanceLogic'
+dal = require './DAL'
+logger = require './logger'
 
 configuration = {
 	markRelevantInterval : 1000
@@ -22,8 +23,8 @@ doDownload = ()->
 		(next)->relevanceLogic.createStatistics storage, next
 		(statistics, next)->relevanceLogic.markRelevantTweets storage, statistics, next
 	], (err)->
-		console.log "."
-		console.log err if err
+		log 'statistics calculated'
+		logger.error err if err
 		setTimeout doDownload, configuration.markRelevantInterval
 		
 doDownload()

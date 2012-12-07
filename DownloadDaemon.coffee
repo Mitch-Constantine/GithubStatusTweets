@@ -1,5 +1,6 @@
 tweetDownloader = require './tweetDownloader' 
 dal = require './DAL'
+twitterInterface = require './TwitterInterface'
 
 configuration = {
 	pollInterval : 1000
@@ -13,7 +14,7 @@ configuration = {
 }
 
 storage = new dal.Storage()
-tweets = new dal.Twitter()
+tweets = new twitterInterface.Twitter()
 
 doDownload = ()->
 	tweetDownloader.download configuration, storage, tweets, (err, err_twitter)->

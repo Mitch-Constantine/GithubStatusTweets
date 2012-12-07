@@ -1,10 +1,15 @@
 async = require('async')
+logger = require './logger'
+
+log = (message, what) -> logger.log 'relevanceLogic', message, what
 
 exports.createStatistics = (dal,next)->
 	statistics = {}
 	dal.eachTweet(
-		(err, tweet) -> addToStatistics(statistics, tweet)
+		(err, tweet) -> 
+			addToStatistics(statistics, tweet)
 		(err)->
+			log 'Statistics completed', statistics
 			next(err,statistics)
 	)
 	
@@ -21,11 +26,12 @@ exports.markRelevantTweets = (dal, wordStatistics, next)->
 						markTweet dal, tweet, wordStatistics, () -> callback()
 					
 				)
+				log 'Queued ', tweet.id
 				if queue.drain == null
 					queue.drain = ()->
 						next()	
 			else
-				console.log err		
+				logger.error err		
 		), 			
 		-> 
 			if queue.empty
@@ -35,12 +41,16 @@ exports.markRelevantTweets = (dal, wordStatistics, next)->
 # Wait till everything done
 relevanceThreshold = 0.7
 markTweet = (dal, tweet, wordStatistics, next) ->
+	log 'Computing relevance for ' + tweet.id, tweet.text
 	words = wordsOf(tweet)
 	relevance = computeRelevance(words, wordStatistics)
 	tweet.deemedRelevant = (relevance >= relevanceThreshold)
 	dal.update {_id:tweet._id}, 
 		{ $set : { deemedRelevant : tweet.deemedRelevant } },
-		(err)-> next()
+		(err)-> 
+			log 'Relevance of tweet ' + tweet.id, relevance
+			log 'Deemed relevant for tweet ' + tweet.id, tweet.deemedRelevant
+			next()
 	
 computeRelevance = (words, wordStatistics) ->
 	pRelevant = 1
@@ -50,19 +60,23 @@ computeRelevance = (words, wordStatistics) ->
 		if pWordRelevant != null 
 			pRelevant = pRelevant * pWordRelevant
 			pIrelevant = pIrelevant * (1-pWordRelevant)
-	if pRelevant == 0 and pIrelevant == 0 then 1 
-	else (pRelevant/(pRelevant + pIrelevant))
+	relevance = if pRelevant == 0 and pIrelevant == 0 then 1 else (pRelevant/(pRelevant + pIrelevant))
+	log 'word relevance for ', [words, relevance]
+	relevance
 	
 minOccurenceThreshold = 1
 relevanceOf = (wordStatistics, word)->
 	statistics = wordStatistics[word]
 	if not statistics or statistics.relevantCount + statistics.irelevantCount < minOccurenceThreshold
+		log 'Word ' + word + ' is irrelevant', ''
 		null
 	else
 		pRelevant = statistics.relevantCount / wordStatistics.totalRelevant
 		pIrelevant = statistics.irelevantCount / wordStatistics.totalIrelevant
-		(pRelevant/(pRelevant + pIrelevant))
-
+		relevance = (pRelevant/(pRelevant + pIrelevant))
+		log 'Relevance of '+ word, statistics
+		relevance
+	
 addToStatistics = (statistics, tweet) ->
 	words = wordsOf(tweet)
 	
@@ -76,6 +90,7 @@ addToStatistics = (statistics, tweet) ->
 		statistics.totalRelevant = (statistics.totalRelevant or 0) + 1
 	if isIrelevant
 		statistics.totalIrelevant = (statistics.totalIrelevant or 0) + 1
+	log 'total count', [statistics.totalRelevant, statistics.totalIrelevant]
 		
 	for word in words
 		unless statistics[word]
@@ -90,7 +105,8 @@ addToStatistics = (statistics, tweet) ->
 		if isIrelevant
 			wordStatistics.irelevantCount = wordStatistics.irelevantCount + 1
 		if isRelevant or isIrelevant
-			wordStatistics.totalCount = wordStatistics.totalCount+1 
+			wordStatistics.totalCount = wordStatistics.totalCount+1
+		log 'word statistics ' + word, wordStatistics 
 
 wordsOf = (tweet)-> splitPhrase(tweet.user.screen_name + " " + tweet.text)
 	
