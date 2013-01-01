@@ -2,7 +2,7 @@ async = require('async')
 Twit = require('twit')
 TwitterInterface = require('./TwitterInterface')
 
-xdescribe "Twitter access", ->
+describe "Twitter access", ->
 	
 	done = false
 	twitterDal = null		

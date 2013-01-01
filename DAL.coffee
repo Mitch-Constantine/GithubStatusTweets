@@ -6,27 +6,18 @@ Server = mongo.Server
 Db = mongo.Db
 
 root = exports ? this
-
 log = (message, what)->logger.log 'database', message, what
 
 exports.Storage = class root.Storage
 	
-	host: null
-	port: null
-	databaseName: null
-	tweetCollectionName: null
-	sinceIdCollectionName: null
-	
-	server : null
-	db : null
-	tweetCollection : null
-	sinceIdCollection : null
-	
 	configure : (configuration) => 
 		log 'configuration', configuration
-		@host = configuration.host
-		@port = configuration.port
-		@databaseName = configuration.databaseName
+		@host = configuration.mongo.hostname
+		@port = configuration.mongo.port
+		@username = configuration.mongo.username
+		@password = configuration.mongo.password
+		@databaseName = configuration.mongo.db
+		@url = configuration.mongo.url
 		@tweetCollectionName = configuration.tweetCollectionName
 		@sinceIdCollectionName = configuration.sinceIdCollectionName 
 	
@@ -46,8 +37,18 @@ exports.Storage = class root.Storage
 			(next)=> @getNextSeqNumber next,
 			(nextId, next)=> 
 				@assignSeqNumber nextId, data
-				@tweetCollection.insert data, {safe: true}, (err)=>next(err)
+				@insert_each data, next
 			],
+			callback
+	
+	insert_each : (data, callback) =>
+		async.forEach data,
+			(item, next) => 
+				if item.id != undefined 
+					@tweetCollection.update {id: item.id}, item, 
+						{safe:true, upsert:true}, (err)->next(err)
+				else # this code is test-only
+					next()
 			callback
 				
 	update : (condition, change, callback) ->
@@ -177,15 +178,18 @@ exports.Storage = class root.Storage
 	close: (callback)=>	@db.close true, (err)->callback(err)	
 			
 	connect : (callback)=>
-		if @server
+		if @db
 			callback(null) 		
 			return
-		@server = new Server(@host, @port, {auto_reconnect: true})
-		@db = new Db(@databaseName, @server)
+				
 		async.waterfall [		
-			(next)=>@db.open (err)->next err
-			(next)=>@db.createCollection @tweetCollectionName, 
-				(err, tweetCollection)->next(err,tweetCollection)
+			(next)=>
+				mongo.connect @getDatabaseUrl(), 
+							  [@tweetCollectionName, @sinceIdCollectionName], next
+			(db, next)=>
+				@db = db
+				@db.createCollection @tweetCollectionName, 
+					(err, tweetCollection)->next(err,tweetCollection)
 			(tweetCollection, next)=>@db.createCollection @sinceIdCollectionName, 
 				(err, sinceIdCollection)->next(err, tweetCollection, sinceIdCollection),
 		],
@@ -193,7 +197,17 @@ exports.Storage = class root.Storage
 			@tweetCollection = tweetCollection
 			@sinceIdCollection = sinceIdCollection
 			callback(err)
-
+			
+	getDatabaseUrl : () => 
+		if @url 
+			url = @url
+		else if @username and @password
+			url = "mongodb://" + @username + ":" + @password + "@" + @host + ":" + @port + "/" + @databaseName
+		else
+			url = "mongodb://" + @host + ":" + @port + "/" + @databaseName
+		log 'getDatabaseUrl', url
+		url
+		
 	assignSeqNumber: (startNumber, data) =>
 		unless data.length
 			@assignSeqNumber startNumber, [data]

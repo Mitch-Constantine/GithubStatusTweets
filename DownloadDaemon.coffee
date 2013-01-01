@@ -1,25 +1,24 @@
-tweetDownloader = require './tweetDownloader' 
+tweetDownloader = require './TweetDownloader' 
 dal = require './DAL'
 twitterInterface = require './TwitterInterface'
+logger = require './logger'
 
-configuration = {
-	pollInterval : 1000
-	term : "401 OR 400 OR 403 OR 407 OR QEW OR DVP OR \"Queen Elizabeth Way\" OR \"Don Valley Parkway\"",
-	location: "43.716589,-79.340686,20mi"
-	host: 'localhost'
-	port: 27017
-	databaseName: 'test'
-	tweetCollectionName: 'tweets'
-	sinceIdCollectionName: 'sinceId'
-}
+log = (message, what) -> logger.log 'downloadDaemon', message, what
+
+configuration = require('./configuration').getConfiguration()
 
 storage = new dal.Storage()
 tweets = new twitterInterface.Twitter()
 
-doDownload = ()->
+start = (next)->
 	tweetDownloader.download configuration, storage, tweets, (err, err_twitter)->
-		console.log err if err
-		console.log err_twitter if err_twitter
-		setTimeout doDownload, configuration.pollInterval
+		logger.error err if err
+		logger.error err_twitter if err_twitter
+		log 'twitter download processed', ''
+		if next 
+			next()
+		else
+			setTimeout start, configuration.pollInterval
 
-doDownload()
+exports.start = start	
+start() if require.main == module 

@@ -4,9 +4,6 @@ logger = require('./logger')
 
 root = exports ? this
 
-logger.enable 'twitter'
-logger.enable 'twitterProgress'
-
 log = (message, what)->logger.log 'twitter', message, what
 logProgress = (message, what)-> logger.log 'twitterProgress', message, what
 
@@ -38,7 +35,8 @@ exports.Twitter = class root.Twitter
 		} unless @T
 		
 		@T.get 'search/tweets', params, (err, reply)=> 
-									
+		
+			log "twitter reply", [err,reply]							
 			data_found = if reply and reply.statuses then reply.statuses else []
 			data_found = (tweet for tweet in data_found when tweet.id != since_id and tweet.id != max_id)		
 			already_found = already_found.concat data_found

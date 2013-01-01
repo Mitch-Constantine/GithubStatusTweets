@@ -4,27 +4,23 @@ relevanceLogic = require './relevanceLogic'
 dal = require './DAL'
 logger = require './logger'
 
-configuration = {
-	markRelevantInterval : 1000
-	term : "401 OR 400 OR 403 OR 407 OR QEW OR DVP OR \"Queen Elizabeth Way\" OR \"Don Valley Parkway\"",
-	location: "43.716589,-79.340686,20mi"
-	host: 'localhost'
-	port: 27017
-	databaseName: 'test'
-	tweetCollectionName: 'tweets'
-	sinceIdCollectionName: 'sinceId'
-}
+configuration = require('./configuration').getConfiguration()
 
 storage = new dal.Storage()
 storage.configure configuration
 
-doDownload = ()->
+start = (next)->
 	async.waterfall [
 		(next)->relevanceLogic.createStatistics storage, next
 		(statistics, next)->relevanceLogic.markRelevantTweets storage, statistics, next
 	], (err)->
-		log 'statistics calculated'
+		logger.log 'UpdateDaemon', 'statistics calculated', ""
 		logger.error err if err
-		setTimeout doDownload, configuration.markRelevantInterval
-		
-doDownload()
+		if next 
+			next()
+		else
+			setTimeout start, configuration.markRelevantInterval
+
+exports.start = start	
+start() if require.main == module 
+ 

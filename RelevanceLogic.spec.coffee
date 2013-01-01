@@ -4,9 +4,11 @@ relevanceLogic = require('./relevanceLogic')
 DAL = require('./DAL')
 
 testConfiguration = {
-	host: 'localhost'
-	port: 27017
-	databaseName: 'test'
+	mongo : {
+		hostname: 'localhost'
+		port: 27017
+		db: 'test'
+	}
 	tweetCollectionName: 'tweetsTest'
 	sinceIdCollectionName: 'sinceIdTest'
 }
@@ -17,27 +19,30 @@ describe "Finding relevant and irelevant tweets", ->
 		done = false
 		dal = new DAL.Storage()
 		dal.configure testConfiguration
+		relevanceCalculator = new relevanceLogic.RelevanceCalculator(dal)
 		runs ->
 			async.waterfall( [
 				(next)->dal.reset next,
 				(next)->dal.save( 
-					{ text: "Relevantone, relevantTwo??", user : {screen_name:""}, relevantCount:4 }, 
+					[{ id:1, text: "Relevantone, relevantTwo??", user : {screen_name:""}, relevantCount:4 }], 
 					next ),
 				(next)->dal.save( 
-					{ text: "relevantone!", user : {screen_name:"RelevantThree"}, relevantCount : 9}, 
+					[{ id : 2, text: "relevantone!", user : {screen_name:"RelevantThree"}, relevantCount : 9}], 
 					next ),
 				(next)->dal.save( 
-					{ text: "irelevantone, irelevantTwo??", user : {screen_name:""}, irelevantCount : 3 }, 
+					[{ id : 3, text: "irelevantone, irelevantTwo??", user : {screen_name:""}, irelevantCount : 3 }], 
 					next ),
 				(next)->dal.save( 
-					{ text: "iRelevantone, ??", user : {screen_name:"irelevant_Three"}, irelevantCount : 3 }, next ),
-				(next)->relevanceLogic.createStatistics dal, next,
-				(data, next)->dal.close (err)->next(err,data)			
+					[{ id : 4, text: "iRelevantone, ??", user : {screen_name:"irelevant_Three"}, irelevantCount : 3 }], next ),
+				(next)->relevanceCalculator.createStatistics next,
+				(next)->dal.close next			
 			],
 			(err, wordStatistics) -> 
 
 				done = true
 				expect(err).toBeFalsy()		
+
+				wordStatistics = relevanceCalculator.statistics
 			
 				expect(wordStatistics["relevantone"].relevantCount).toBe(2)
 				expect(wordStatistics["relevanttwo"].relevantCount).toBe(1)
@@ -98,17 +103,21 @@ describe "Finding relevant and irelevant tweets", ->
 			async.waterfall( [
 				(next)->dal.reset next,
 				(next)->dal.save( 
-					{ text: phrase1, user : {screen_name :"" }, relevantCount:4 }, 
+					[{ id : 1, text: phrase1, user : {screen_name :"" }, relevantCount:4 }], 
 					next ),
 				(next)->dal.save( 
-					{ text: phrase2, user : {screen_name:"" }, relevantCount : 9}, 
+					[{ id :2, text: phrase2, user : {screen_name:"" }, relevantCount : 9}], 
 					next ),
 				(next)->dal.save( 
-					{ text: text3, user : {screen_name:phrase3}, irelevantCount : 3 }, 
+					[{ id :3, text: text3, user : {screen_name:phrase3}, irelevantCount : 3 }], 
 					next ),
-				(next)->relevanceLogic.markRelevantTweets dal, wordStatistics, next
+				(next)->
+					relevanceCalculator = new relevanceLogic.RelevanceCalculator(dal)
+					relevanceCalculator.statistics = wordStatistics
+					relevanceCalculator.markRelevantTweets next
 				(next)->dal.getAll next,
-				(data, next)->dal.close (err)->next(err,data)			
+				(data, next)->
+					dal.close (err)->next(err,data)			
 			],
 			(err, tweets) -> 
 				done = true
@@ -124,6 +133,5 @@ describe "Finding relevant and irelevant tweets", ->
 						expect( tweet.deemedRelevant ).toBeFalsy("Tweet 2 expected irrelevant")
 					else if tweet.user.screen_name == phrase3
 						expect( tweet.deemedRelevant).toBeFalsy("Tweet 3 expected irrelevant")
-			)
-		
+			)		
 		waitsFor (->done), "Statistics creation", 2000

@@ -1,0 +1,17 @@
+--- 
+applications: 
+  .: 
+    infra: aws
+    framework: 
+      info: 
+        exec: 
+        mem: 64M
+        description: Node.js Application
+      name: node
+    instances: 1
+    mem: 1G
+    services: 
+      mongodb-3c69c: 
+        type: mongodb
+    url: ${name}.${target-base}
+    name: torontohwy

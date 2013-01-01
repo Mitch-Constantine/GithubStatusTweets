@@ -11,4 +11,4 @@ exports.log = (category, message, what)->
 root.categories = {}
 
 exports.enable 'error'
-exports.error = (err) -> logger.log 'error', '', err
+exports.error = (err) -> exports.log 'error', '', err
